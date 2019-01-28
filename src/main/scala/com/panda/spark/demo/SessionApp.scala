@@ -32,7 +32,8 @@ object SessionApp {
         if ( inCount > 30 ||  actCount> 120) {
           c += 1
           all += ClickStreamSession( v._1,v._2,1, v._1+"_"+c,v._2.toLocalDateTime.getYear+"-"+v._2.toLocalDateTime.getMonthValue,v._2.toLocalDateTime.getDayOfMonth.toString)
-          min,totalMin = v._2
+          min = v._2
+          totalMin = min
         }
         else {
           min = v._2
