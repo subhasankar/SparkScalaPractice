@@ -7,5 +7,6 @@ object Test {
 val log=LoggerFactory.getLogger(getClass)
   def main(args: Array[String]): Unit = {
     log.debug("this is nt working")
+
   }
 }
