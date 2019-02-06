@@ -10,6 +10,10 @@ def getSparkSession= {
     .config("spark.master", "local")
     .config("spark.submit.deployMode", "client")
     .config("spark.sql.shuffle.partitions", "2")
+//    .config("spark.executor.instances","2")
+  //  .config("spark.executor.cores","2")
+
+
     //.enableHiveSupport()
     .getOrCreate()
   spark.sparkContext.addSparkListener(new SparkListener() {
