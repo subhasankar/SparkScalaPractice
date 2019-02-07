@@ -10,8 +10,8 @@ import org.apache.spark.sql.types._
 
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
-case class PersonInput(id:Int,name:String,age:Int,friends:String)
-case class PersonFriend(id:Int,name:String,age:Int,friendName:String,fAge:Int,fdate:Long)
+//case class PersonInput(id:Int,name:String,age:Int,friends:String)
+//case class PersonFriend(id:Int,name:String,age:Int,friendName:String,fAge:Int,fdate:Long)
 case class Friend(name:String,age:Int,date:Timestamp)
 case class Person(id:Int,name:String,age:Int,friends:Array[Friend])
 
@@ -21,7 +21,7 @@ object PersonWithFriends {
     import spark.implicits._
     val personSchema=Encoders.product[Person].schema
     val persons=spark.read.schema(personSchema).json("inputs/person.json")
-    persons.withColumn("friends", explode($"friends")).orderBy(col("friends.date").desc,col("friends.age").desc).show(false)
+    persons.withColumn("friends", explode($"friends")).withColumn("ageDiff",abs(col("age").minus(col("friends.age")))).orderBy(col("friends.date").asc,col("ageDiff").desc).show(false)
     persons.printSchema()
 
 
