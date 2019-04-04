@@ -21,6 +21,7 @@ object App {
       def getPartition(key: Any) = key.asInstanceOf[Int]
     }
     val input=spark.sparkContext.parallelize(1 to 100,10)
+
     val partitioned=input.mapPartitionsWithIndex((i,p)=>{
       val overlap = p.take(3 - 1).toArray
       val spill = overlap.iterator.map((i - 1, _))
