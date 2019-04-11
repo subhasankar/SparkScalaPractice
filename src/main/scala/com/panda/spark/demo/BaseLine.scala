@@ -1,7 +1,8 @@
 package com.panda.spark.demo
+
 import java.sql.Date
 
-import org.apache.spark.sql.{DataFrame, Dataset, Encoders, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, Dataset, Encoders, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.expressions.Window
 
@@ -17,7 +18,7 @@ object BaseLine {
     val baseData=calcBasePriceAndPromo(salesData)
     //Finally storing to hive or hdfs file
     storeBaseData(baseData)
-   // System.in.read
+    System.in.read
   }
 
 
@@ -30,10 +31,8 @@ object BaseLine {
   }
 
   def calcBasePriceAndPromo(salesData: Dataset[SalesData]) = {
-    //2 window spec if rank<7 and one if rank >7 might need to find alternate solutions
-    val windowSpec = Window.partitionBy("upc", "store", "gm_brand_cn", "gm_brand_en", "gm_category_cn", "gm_category_en", "gm_subcategory_cn", "gm_subcategory_en", "gm_channel").orderBy(col("weekRank").asc).rowsBetween( -numOfWeeks,-1)
-    val windowSpec1 = Window.partitionBy("upc", "store", "gm_brand_cn", "gm_brand_en", "gm_category_cn", "gm_category_en", "gm_subcategory_cn", "gm_subcategory_en", "gm_channel").orderBy(col("weekRank").asc).rowsBetween(  -numOfWeeks,numOfWeeks-1)
-    val windowSpecForRank = Window.partitionBy("upc", "store", "gm_brand_cn", "gm_brand_en", "gm_category_cn", "gm_category_en", "gm_subcategory_cn", "gm_subcategory_en", "gm_channel").orderBy(col("calendar_year_short_desc").asc,col("calendar_week_nbr").asc)
+    //window spec for base price
+    val windowSpec = Window.partitionBy("upc", "store", "gm_brand_cn", "gm_brand_en", "gm_category_cn", "gm_category_en", "gm_subcategory_cn", "gm_subcategory_en", "gm_channel").orderBy(col("calendar_year_short_desc").desc,col("calendar_week_nbr").desc)
 
 
     //remove the next 2 filters and uncomment the 3rd line
@@ -44,23 +43,16 @@ object BaseLine {
     //creating aggregated columns
     val aggData=filteredData.groupBy("upc","calendar_week_nbr","calendar_year_short_desc","store","gm_brand_cn",
       "gm_brand_en","gm_category_cn","gm_category_en","gm_subcategory_cn","gm_subcategory_en","gm_channel").
-      agg(sum("total_sales_amount").as("total_sales_amount"),
+        agg(sum("total_sales_amount").as("total_sales_amount"),
         sum("total_sales_volume_units").as("total_sales_volume_units"),
         round(sum("total_sales_amount")/sum("total_sales_volume_units")).as("avg_price"))
 
-
-    //creating rank as per week and year
-    val rankedAggData = aggData.withColumn("weekRank",rank().over(windowSpecForRank))
-
-      rankedAggData
-        //if rank <3 it will take all the values of 1 , 2 , 3 rank else it will take last 3 ranks value
-      .withColumn("base_price1",when(col("weekRank").gt(numOfWeeks),(collect_list("avg_price").over(windowSpec))).
-         otherwise((collect_list("avg_price").over(windowSpec1))))
-      .withColumn("base_price",maxUdf(col("base_price1"))) //udf call to find max
+    aggData
+      .withColumn("basePriceX", array((1 to 3).map(e=>coalesce(lead("avg_price",e).over(windowSpec),lead("avg_price",e-3).over(windowSpec))): _*))
+      .withColumn("base_price", greatest((1 to 3).map(e=>coalesce(lead("avg_price",e).over(windowSpec),lead("avg_price",e-3).over(windowSpec))): _*))
       .withColumn("discount",col("base_price").minus(col("avg_price")))
       .withColumn("percentage",round((col("discount").divide(col("base_price"))).multiply(100)))
       .withColumn("promo_flag",when(col("percentage").geq(5),"1").otherwise("0"))
-      .drop("weekRank","base_price1") //dropping the unnecessary comments , remove for debugging
 
 
   }
@@ -73,11 +65,11 @@ object BaseLine {
 
   }
 
-  //Udf to find the max value from the list
-val maxUdf= udf {
-  s: Seq[Double] =>
-    s.take(numOfWeeks).max
-}
+  //Udf to find the max value from the list -- this is not used as greatest function is same
+//val maxUdf= udf {
+//  s: Seq[Double] =>
+//    s.max
+//}
 
 }
 
